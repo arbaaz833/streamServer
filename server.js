@@ -1,70 +1,39 @@
 const child_process = require("child_process"); // To be used later for running FFmpeg
 const express = require("express");
-// const WebSocket = require('ws')
 const { Server } = require("socket.io");
 const app = express();
 const cors = require("cors");
-const path = require("path");
-const tmi = require("tmi.js");
-const httpServer = require("http").createServer();
 
 require("dotenv").config();
 
-const { inputSettings, twitchSettings, youtubeSettings, facebookSettings, customRtmpSettings } = require("./ffmpeg");
-
-const { ffmpeg2 } = require("./ffmpeg2");
+const { inputSettings, youtubeSettings } = require("./ffmpeg");
 
 app.use(cors());
 app.use(express.static("public"));
 app.use(express.json({ limit: "200mb", extended: true }));
-app.use(express.urlencoded({ limit: "200mb", extended: true, parameterLimit: 50000 }));
+app.use(
+  express.urlencoded({ limit: "200mb", extended: true, parameterLimit: 50000 })
+);
 
 const authenticationRouter = require("./routes/authentication");
 const broadcastsRouter = require("./routes/broadcasts");
-const compareCodeRouter = require("./routes/compareCode");
-const destinationsRouter = require("./routes/destinations");
 const emailEventNotificationsRouter = require("./routes/emailEventNotifications");
-const hubspotRouter = require("./routes/hubspot");
 const referralRouter = require("./routes/referral");
-const stripeRouter = require("./routes/stripe");
-const facebookAuthorizationRouter = require("./routes/facebookAuthorization");
-const facebookBroadcastRouter = require("./routes/facebookBroadcast");
-const facebookViewCountRouter = require("./routes/facebookViewCount");
-const twitchAuthorizationRouter = require("./routes/twitchAuthorization");
-const twitchBroadcastRouter = require("./routes/twitchBroadcast");
-const twitchViewCountRouter = require("./routes/twitchViewCount");
 const youtubeAuthorizationRouter = require("./routes/youtubeAuthorization");
 const youtubeBroadcastRouter = require("./routes/youtubeBroadcast");
 const youtubeViewCountRouter = require("./routes/youtubeViewCount");
 
 app.use("/", authenticationRouter);
 app.use("/", broadcastsRouter);
-app.use("/", compareCodeRouter);
-app.use("/", destinationsRouter);
 app.use("/", emailEventNotificationsRouter);
-app.use("/", facebookAuthorizationRouter);
-app.use("/", facebookBroadcastRouter);
-app.use("/", facebookViewCountRouter);
-app.use("/", hubspotRouter);
-app.use("/", twitchAuthorizationRouter);
-app.use("/", twitchBroadcastRouter);
-app.use("/", twitchViewCountRouter);
 app.use("/", referralRouter);
-app.use("/", stripeRouter);
 app.use("/", youtubeAuthorizationRouter);
 app.use("/", youtubeBroadcastRouter);
 app.use("/", youtubeViewCountRouter);
 
+// Incase if we need to get port from env
 const PORT = process.env.PORT || 5001;
 const WS_PORT = process.env.PORT || 3001;
-
-// app.listen(PORT, () => {
-//   console.log(`Listening on PORT ${PORT} for REST API requests`);
-// });
-
-// const wss = new WebSocket.Server({ port: WS_PORT }, () => {
-//   console.log(`Listening on PORT ${WS_PORT} for websockets`)
-// })
 
 const io = new Server(3001, {
   /* options */
@@ -82,49 +51,16 @@ io.on("connection", (socket) => {
 
   const youtube = socketQueryParams.youtubeUrl;
   console.log("youtube: ", youtube);
-  // const twitchStreamKey = socketQueryParams.twitchStreamKey;
-  // const twitch = twitchStreamKey !== "null" ? "rtmp://dfw.contribute.live-video.net/app/" + twitchStreamKey : null;
-  // const twitchUsername = socketQueryParams.twitchUsername;
 
-  // const facebook = socketQueryParams.facebookUrl;
+  const ffmpegInput = inputSettings.concat(youtubeSettings(youtube));
 
-  // const customRTMP = socketQueryParams.customRTMP;
-  // console.log("twitchUsername: " + twitchUsername);
-
-  // TWITCH CHAT TMI.JS
-
-  // const client = new tmi.Client({
-  //   channels: [twitchUsername],
-  // })
-
-  // client.connect()
-
-  // client.on('message', (channel, tags, message, self) => {
-  //   console.log(`${tags['display-name']}: ${message}`)
-  //   socket.emit('twitch-msg', `${tags['display-name']}: ${message}`)
-  // })
-
-  // END TWITCH CHAT TMI.JS
-
-  const ffmpegInput = inputSettings.concat(
-    youtubeSettings(youtube)
-    // twitchSettings(twitch),
-    // facebookSettings(facebook),
-    // customRtmpSettings(customRTMP)
-  );
-
-  // console.log(ffmpegInput)
-
-  // const ffmpeg = child_process.spawn(
-  //   'ffmpeg',
-  //   ffmpeg2(youtube, twitch, facebook)
-  // )
   const ffmpeg = child_process.spawn("ffmpeg", ffmpegInput);
 
   // If FFmpeg stops for any reason, close the WebSocket connection.
   ffmpeg.on("close", (code, signal) => {
-    console.log("FFmpeg child process closed, code " + code + ", signal " + signal);
-    // ws.terminate()
+    console.log(
+      "FFmpeg child process closed, code " + code + ", signal " + signal
+    );
   });
 
   // Handle STDIN pipe errors by logging to the console.
@@ -154,5 +90,3 @@ io.on("connection", (socket) => {
     ffmpeg.kill("SIGINT");
   });
 });
-
-// httpServer.listen(3001);
